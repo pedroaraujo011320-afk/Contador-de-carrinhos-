@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador e Rastreador de Carrinhos</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --success: #2ecc71;
+            --warning: #e74c3c;
+            --text: #333333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .controls-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"] {
+            padding: 10px 15px;
+            font-size: 16px;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            width: 250px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent);
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background-color: var(--accent);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .cart-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+        }
+
+        .cart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cart-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 0;
+        }
+
+        .btn-delete {
+            background-color: var(--warning);
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .btn-delete:hover {
+            background-color: #c0392b;
+        }
+
+        .timer-display {
+            font-family: monospace;
+            font-size: 24px;
+            text-align: center;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .timer-buttons, .tracking-info {
+            display: flex;
+            gap: 5px;
+            justify-content: space-between;
+        }
+
+        .timer-buttons button {
+            flex: 1;
+            font-size: 14px;
+            padding: 8px;
+        }
+
+        .btn-start { background-color: var(--success); }
+        .btn-start:hover { background-color: #27ae60; }
+        .btn-pause { background-color: #f39c12; }
+        .btn-pause:hover { background-color: #d35400; }
+        .btn-reset { background-color: #7f8c8d; }
+        .btn-reset:hover { background-color: #626567; }
+
+        .tracking-box {
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            background-color: var(--success);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Painel de Controle de Carrinhos</h1>
+        <p>Adicione quantos carrinhos desejar, controle os cronômetros e monitore o rastreamento individual.</p>
+    </header>
+
+    <div class="controls-container">
+        <input type="text" id="cartNameInput" placeholder="Nome do carrinho (Ex: Carrinho 01)">
+        <button onclick="addCart()">Adicionar Carrinho</button>
+    </div>
+
+    <div class="grid-container" id="cartGrid">
+        <!-- Os carrinhos serão inseridos aqui dinamicamente -->
+    </div>
+
+    <script>
+        let carts = [];
+
+        function addCart() {
+            const input = document.getElementById('cartNameInput');
+            const name = input.value.trim() || `Carrinho ${carts.length + 1}`;
+            
+            const newCart = {
+                id: Date.now() + Math.random(),
+                name: name,
+                seconds: 0,
+                timerInterval: null,
+                isRunning: false,
+                latitude: (-23.5505 + (Math.random() - 0.5) * 0.01).toFixed(4),
+                longitude: (-46.6333 + (Math.random() - 0.5) * 0.01).toFixed(4),
+                speed: (Math.random() * 15).toFixed(1)
+            };
+
+            carts.push(newCart);
+            input.value = '';
+            renderCarts();
+        }
+
+        function removeCart(id) {
+            const cart = carts.find(c => c.id === id);
+            if (cart && cart.timerInterval) {
+                clearInterval(cart.timerInterval);
+            }
+            carts = carts.filter(c => c.id !== id);
+            renderCarts();
+        }
+
+        function toggleTimer(id) {
+            const cart = carts.find(c => c.id === id);
+            if (!cart) return;
+
+            if (cart.isRunning) {
+                clearInterval(cart.timerInterval);
+                cart.isRunning = false;
+            } else {
+                cart.isRunning = true;
+                cart.timerInterval = setInterval(() => {
+                    cart.seconds++;
+                    updateTimerDisplay(cart.id);
+                }, 1000);
+            }
+            renderCarts();
+        }
+
+        function resetTimer(id) {
+            const cart = carts.find(c => c.id === id);
+            if (!cart) return;
+
+            clearInterval(cart.timerInterval);
+            cart.isRunning = false;
+            cart.seconds = 0;
+            renderCarts();
+        }
+
+        function formatTime(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+            const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+            const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}`;
+        }
+
+        function updateTimerDisplay(id) {
+            const cart = carts.find(c => c.id === id);
+            if (cart) {
+                const display = document.getElementById(`timer-${id}`);
+                if (display) {
+                    display.innerText = formatTime(cart.seconds);
+                }
+            }
+        }
+
+        function renderCarts() {
+            const grid = document.getElementById('cartGrid');
+            grid.innerHTML = '';
+
+            carts.forEach(cart => {
+                const card = document.createElement('div');
+                card.className = 'cart-card';
+
+                card.innerHTML = `
+                    <div class="cart-header">
+                        <span class="cart-title">${cart.name}</span>
+                        <button class="btn-delete" onclick="removeCart(${cart.id})">Excluir</button>
+                    </div>
+                    
+                    <div class="timer-display" id="timer-${cart.id}">
+                        ${formatTime(cart.seconds)}
+                    </div>
+
+                    <div class="timer-buttons">
+                        <button class="${cart.isRunning ? 'btn-pause' : 'btn-start'}" onclick="toggleTimer(${cart.id})">
+                            ${cart.isRunning ? 'Pausar' : 'Iniciar'}
+                        </button>
+                        <button class="btn-reset" onclick="resetTimer(${cart.id})">Zerar</button>
+                    </div>
+
+                    <div class="tracking-box">
+                        <strong>Rastreamento HTML / Conectado</strong>
+                        <div>Status: <span class="status-badge">Online</span></div>
+                        <div>Lat/Long: ${cart.latitude}, ${cart.longitude}</div>
+                        <div>Velocidade: ${cart.speed} km/h</div>
+                    </div>
+                `;
+
+                grid.add = grid.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
